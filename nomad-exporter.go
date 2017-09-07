@@ -72,6 +72,11 @@ var (
 		"Allocation throttled CPU",
 		[]string{"job", "group", "alloc", "region", "datacenter", "node"}, nil,
 	)
+	allocationRestarted = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "allocation_restarted"),
+		"Allocation restarted count",
+		[]string{"alloc_name", "alloc_id"}, nil,
+	)
 	taskCPUTotalTicks = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "", "task_cpu_total_ticks"),
 		"Task CPU total ticks",
@@ -154,6 +159,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- allocationMemory
 	ch <- allocationCPU
 	ch <- allocationCPUThrottled
+	ch <- allocationRestarted
 	ch <- allocationMemoryLimit
 	ch <- taskCPUPercent
 	ch <- taskCPUTotalTicks
@@ -292,6 +298,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				for _, alloc := range runningAllocs {
 					allocatedCPU += alloc.Resources.CPU
 					allocatedMemory += alloc.Resources.MemoryMB
+					for _, i := range alloc.TaskStates {
+						ch <- prometheus.MustNewConstMetric(
+							allocationRestarted, prometheus.GaugeValue, float64(i.Restarts), alloc.Name, alloc.ID,
+						)
+					}
 				}
 
 				ch <- prometheus.MustNewConstMetric(
@@ -395,3 +406,4 @@ func logError(err error) {
 	log.Println("Query error", err)
 	return
 }
+
